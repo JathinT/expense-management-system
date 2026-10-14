@@ -14,10 +14,11 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     @Query("SELECT e FROM Expense e WHERE (:category IS NULL OR LOWER(e.category) = LOWER(:category)) "
             + "AND (:startDate IS NULL OR e.expenseDate >= :startDate) "
-            + "AND (:endDate IS NULL OR e.expenseDate <= :endDate)")
+            + "AND (:endDate IS NULL OR e.expenseDate <= :endDate) "
+            + "ORDER BY e.expenseDate DESC")
     List<Expense> findByOptionalFilters(@Param("category") String category,
-                                       @Param("startDate") LocalDate startDate,
-                                       @Param("endDate") LocalDate endDate);
+                                        @Param("startDate") LocalDate startDate,
+                                        @Param("endDate") LocalDate endDate);
 
     @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE (:category IS NULL OR LOWER(e.category) = LOWER(:category)) "
             + "AND (:startDate IS NULL OR e.expenseDate >= :startDate) "
@@ -25,9 +26,4 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     BigDecimal calculateTotalWithFilters(@Param("category") String category,
                                          @Param("startDate") LocalDate startDate,
                                          @Param("endDate") LocalDate endDate);
-
-    // existing method used by older tests / code (if present) can remain — JpaRepository provides findAll()
-
-    // If there is an existing custom calculateTotal(), keep it (method name might be calculateTotal). To remain compatible with existing code,
-    // we don't remove/override any existing methods here.
 }
