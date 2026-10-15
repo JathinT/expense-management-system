@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const today = new Date()
 const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -36,12 +36,29 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  const loadExpenses = useCallback(async () => {
+  // filter input state (controls)
+  const [filterCategory, setFilterCategory] = useState('')
+  const [filterStartDate, setFilterStartDate] = useState('')
+  const [filterEndDate, setFilterEndDate] = useState('')
+  // applied filters (used for loading data)
+  const [appliedFilters, setAppliedFilters] = useState({})
+
+  async function loadExpenses(filters = {}) {
     setError('')
+    setLoading(true)
     try {
+      const params = new URLSearchParams()
+      if (filters.category) params.append('category', filters.category)
+      if (filters.startDate) params.append('startDate', filters.startDate)
+      if (filters.endDate) params.append('endDate', filters.endDate)
+
+      const query = params.toString()
+      const listUrl = apiUrl(`/expenses${query ? `?${query}` : ''}`)
+      const totalUrl = apiUrl(`/expenses/total${query ? `?${query}` : ''}`)
+
       const [listResponse, totalResponse] = await Promise.all([
-        fetch(apiUrl('/expenses')),
-        fetch(apiUrl('/expenses/total')),
+        fetch(listUrl),
+        fetch(totalUrl),
       ])
       if (!listResponse.ok || !totalResponse.ok) throw new Error('Could not load expenses. Please try again.')
       const [list, totalData] = await Promise.all([listResponse.json(), totalResponse.json()])
@@ -52,11 +69,12 @@ function App() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }
 
   useEffect(() => {
-    loadExpenses()
-  }, [loadExpenses])
+    // initial load with no filters
+    loadExpenses({})
+  }, [])
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -73,7 +91,8 @@ function App() {
         throw new Error(body.message || Object.values(body)[0] || 'Could not add expense.')
       }
       setForm(emptyForm)
-      await loadExpenses()
+      // reload using currently applied filters so list reflects where the new expense would be
+      await loadExpenses(appliedFilters)
     } catch (submitError) {
       setError(submitError.message)
     } finally {
@@ -86,10 +105,29 @@ function App() {
     try {
       const response = await fetch(apiUrl(`/expenses/${id}`), { method: 'DELETE' })
       if (!response.ok) throw new Error('Could not delete expense. Please try again.')
-      await loadExpenses()
+      await loadExpenses(appliedFilters)
     } catch (deleteError) {
       setError(deleteError.message)
     }
+  }
+
+  function applyFilters() {
+    const filters = {
+      category: filterCategory.trim() || undefined,
+      startDate: filterStartDate || undefined,
+      endDate: filterEndDate || undefined,
+    }
+    const cleaned = Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== undefined))
+    setAppliedFilters(cleaned)
+    loadExpenses(cleaned)
+  }
+
+  function clearFilters() {
+    setFilterCategory('')
+    setFilterStartDate('')
+    setFilterEndDate('')
+    setAppliedFilters({})
+    loadExpenses({})
   }
 
   return (
@@ -143,6 +181,26 @@ function App() {
             </div>
             <span className="count-badge">{expenses.length}</span>
           </div>
+
+          <div className="filters">
+            <label>
+              Category
+              <input type="text" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} placeholder="e.g. Food" />
+            </label>
+            <label>
+              Start date
+              <input type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} />
+            </label>
+            <label>
+              End date
+              <input type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} />
+            </label>
+            <div className="filter-buttons">
+              <button type="button" onClick={applyFilters} className="primary-button">Apply filters</button>
+              <button type="button" onClick={clearFilters} className="secondary-button">Clear</button>
+            </div>
+          </div>
+
           {loading ? <p className="empty-state">Loading expenses…</p> : expenses.length === 0 ? (
             <p className="empty-state">No expenses yet. Add one to get started.</p>
           ) : (

@@ -58,19 +58,36 @@ class ExpenseServiceTest {
     }
 
     @Test
+    void retrievesExpensesWithFilters() {
+        when(expenseRepository.findByOptionalFilters("Food", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31)))
+                .thenReturn(List.of(expense));
+
+        List<Expense> results = expenseService.findAll("Food", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31));
+        assertEquals(List.of(expense), results);
+    }
+
+    @Test
+    void calculatesTotal() {
+        when(expenseRepository.calculateTotalWithFilters(null, null, null)).thenReturn(new BigDecimal("12.50"));
+
+        assertEquals(new BigDecimal("12.50"), expenseService.calculateTotal());
+    }
+
+    @Test
+    void calculatesTotalWithFilters() {
+        when(expenseRepository.calculateTotalWithFilters("Food", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31)))
+                .thenReturn(new BigDecimal("12.50"));
+
+        assertEquals(new BigDecimal("12.50"), expenseService.calculateTotal("Food", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31)));
+    }
+
+    @Test
     void deletesExistingExpense() {
         when(expenseRepository.existsById(1L)).thenReturn(true);
 
         expenseService.delete(1L);
 
         verify(expenseRepository).deleteById(1L);
-    }
-
-    @Test
-    void calculatesTotal() {
-        when(expenseRepository.calculateTotal()).thenReturn(new BigDecimal("12.50"));
-
-        assertEquals(new BigDecimal("12.50"), expenseService.calculateTotal());
     }
 
     @Test

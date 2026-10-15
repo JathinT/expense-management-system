@@ -4,6 +4,7 @@ import com.example.expenses.dto.ExpenseRequest;
 import com.example.expenses.entity.Expense;
 import com.example.expenses.repository.ExpenseRepository;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,14 @@ public class ExpenseService {
         return expenseRepository.findAll();
     }
 
+    /**
+     * Find expenses with optional filters. Any parameter may be null to indicate no filtering on that field.
+     */
+    @Transactional(readOnly = true)
+    public List<Expense> findAll(String category, LocalDate startDate, LocalDate endDate) {
+        return expenseRepository.findByOptionalFilters(category, startDate, endDate);
+    }
+
     @Transactional(readOnly = true)
     public Expense findById(Long id) {
         return expenseRepository.findById(id)
@@ -45,6 +54,23 @@ public class ExpenseService {
 
     @Transactional(readOnly = true)
     public BigDecimal calculateTotal() {
-        return expenseRepository.calculateTotal();
+        // Some implementations may provide a calculateTotal() custom query; if not, use repository.calculateTotalWithFilters with nulls.
+        try {
+            return expenseRepository.calculateTotalWithFilters(null, null, null);
+        } catch (Exception e) {
+            // Fall back to summing in Java if repository method not available for any reason
+            return expenseRepository.findAll().stream()
+                    .map(Expense::getAmount)
+                    .filter(a -> a != null)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+    }
+
+    /**
+     * Calculate total with optional filters. Any parameter may be null.
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal calculateTotal(String category, LocalDate startDate, LocalDate endDate) {
+        return expenseRepository.calculateTotalWithFilters(category, startDate, endDate);
     }
 }
