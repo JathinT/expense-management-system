@@ -4,6 +4,30 @@ const today = new Date()
 const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 const emptyForm = { amount: '', category: '', description: '', expenseDate: localDate }
 
+// Helper to build API URLs based on VITE_API_BASE_URL.
+// - If VITE_API_BASE_URL is set, it is used as the backend base. We normalize it and ensure it points to the /api prefix.
+// - If not set (development), we return paths under "/api" so Vite's dev proxy continues to work.
+function apiUrl(path) {
+  const envBase = import.meta.env.VITE_API_BASE_URL
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+
+  if (!envBase) {
+    // Development: rely on Vite proxy for /api
+    return `/api${normalizedPath}`
+  }
+
+  // Production: use configured base. Trim trailing slashes and ensure a single /api segment.
+  let base = String(envBase).trim()
+  // Remove trailing slashes
+  base = base.replace(/\/+$/, '')
+  // Ensure base ends with /api
+  if (!base.endsWith('/api')) {
+    base = `${base}/api`
+  }
+
+  return `${base}${normalizedPath}`
+}
+
 function App() {
   const [expenses, setExpenses] = useState([])
   const [total, setTotal] = useState('0.00')
@@ -28,8 +52,9 @@ function App() {
       if (filters.startDate) params.append('startDate', filters.startDate)
       if (filters.endDate) params.append('endDate', filters.endDate)
 
-      const listUrl = params.toString() ? `/api/expenses?${params.toString()}` : '/api/expenses'
-      const totalUrl = params.toString() ? `/api/expenses/total?${params.toString()}` : '/api/expenses/total'
+      const query = params.toString()
+      const listUrl = apiUrl(`/expenses${query ? `?${query}` : ''}`)
+      const totalUrl = apiUrl(`/expenses/total${query ? `?${query}` : ''}`)
 
       const [listResponse, totalResponse] = await Promise.all([
         fetch(listUrl),
@@ -56,7 +81,7 @@ function App() {
     setError('')
     setSaving(true)
     try {
-      const response = await fetch('/api/expenses', {
+      const response = await fetch(apiUrl('/expenses'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, amount: Number(form.amount) }),
@@ -78,7 +103,7 @@ function App() {
   async function handleDelete(id) {
     setError('')
     try {
-      const response = await fetch(`/api/expenses/${id}`, { method: 'DELETE' })
+      const response = await fetch(apiUrl(`/expenses/${id}`), { method: 'DELETE' })
       if (!response.ok) throw new Error('Could not delete expense. Please try again.')
       await loadExpenses(appliedFilters)
     } catch (deleteError) {

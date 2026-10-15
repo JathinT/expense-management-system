@@ -52,3 +52,37 @@ All endpoints use JSON. An expense has `amount` (positive decimal), `category` (
 | `GET` | `/api/expenses/total` | Calculate the total | `200 OK`, `{"total": 0}` |
 
 Missing expenses return `404` with a message. Invalid create requests return `400` with field-level validation messages.
+
+## Deploying the backend with Docker (Render)
+
+This repository includes a Dockerfile for the backend (backend/Dockerfile) that builds the project using Maven on Java 17 and runs the generated Spring Boot jar. The Docker build runs the Maven package goal and therefore executes the project's tests as part of the image build.
+
+Notes and usage:
+
+- The Dockerfile is a multi-stage build:
+  - Build stage: uses a Maven + JDK 17 image to run `mvn package` (tests will run).
+  - Runtime stage: uses a JRE 17 image to run the produced jar.
+
+- The application will listen on the port supplied by the PORT environment variable at runtime. The Dockerfile's CMD passes the PORT value to Spring Boot so hosted environments (like Render) can control the listening port.
+
+Local build and run example:
+
+```bash
+# Build the Docker image from the backend directory
+docker build -t expense-backend ./backend
+
+# Run the container, mapping the PORT and exposing it on the host
+docker run -e PORT=8080 -p 8080:8080 expense-backend
+```
+
+Deploying on Render:
+
+1. Create a new Web Service on Render and connect your repository.
+2. Choose the Docker option (Render will use the repository Dockerfile). The Dockerfile to use is `backend/Dockerfile` — if Render expects a Dockerfile in repo root, configure the service to provide the build context `backend/`.
+3. Render will provide the `$PORT` environment variable automatically; the image will read this and run the application on the assigned port.
+
+Security and tests:
+
+- No secrets are committed in this change.
+- The Docker build runs the Maven package phase which includes running unit tests; ensure tests pass before pushing or deploying.
+
