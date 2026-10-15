@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 
 const today = new Date()
 const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -36,12 +36,19 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  // filter input state (controls)
+  // filter input state (controls) - kept for compatibility though inputs are now in a panel
   const [filterCategory, setFilterCategory] = useState('')
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
   // applied filters (used for loading data)
   const [appliedFilters, setAppliedFilters] = useState({})
+
+  // Drawer/panel state and ephemeral panel inputs
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [panelCategory, setPanelCategory] = useState('')
+  const [panelStartDate, setPanelStartDate] = useState('')
+  const [panelEndDate, setPanelEndDate] = useState('')
+  const panelCategoryRef = useRef(null)
 
   async function loadExpenses(filters = {}) {
     setError('')
@@ -111,6 +118,7 @@ function App() {
     }
   }
 
+  // Legacy apply/clear functions (left usable if needed elsewhere)
   function applyFilters() {
     const filters = {
       category: filterCategory.trim() || undefined,
@@ -123,12 +131,66 @@ function App() {
   }
 
   function clearFilters() {
+    // clear both inline/legacy inputs and panel inputs + applied filters
+    setFilterCategory('')
+    setFilterStartDate('')
+    setFilterEndDate('')
+    setPanelCategory('')
+    setPanelStartDate('')
+    setPanelEndDate('')
+    setAppliedFilters({})
+    loadExpenses({})
+  }
+
+  // Panel-specific behaviors
+  function openFilterPanel() {
+    // Initialize panel inputs from currently applied filters so reopening shows applied values
+    setPanelCategory(appliedFilters.category || '')
+    setPanelStartDate(appliedFilters.startDate || '')
+    setPanelEndDate(appliedFilters.endDate || '')
+    setIsFilterOpen(true)
+  }
+
+  function closeFilterPanel() {
+    // discard edits in panel (do not change appliedFilters)
+    setIsFilterOpen(false)
+  }
+
+  function applyFiltersFromPanel() {
+    const filters = {
+      category: panelCategory.trim() || undefined,
+      startDate: panelStartDate || undefined,
+      endDate: panelEndDate || undefined,
+    }
+    const cleaned = Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== undefined))
+    setAppliedFilters(cleaned)
+    loadExpenses(cleaned)
+    setIsFilterOpen(false)
+  }
+
+  function clearFiltersFromPanel() {
+    // Clear applied filters and panel inputs. Keep panel open so user sees cleared state.
+    setPanelCategory('')
+    setPanelStartDate('')
+    setPanelEndDate('')
     setFilterCategory('')
     setFilterStartDate('')
     setFilterEndDate('')
     setAppliedFilters({})
     loadExpenses({})
   }
+
+  // Focus first input when panel opens for accessibility
+  useEffect(() => {
+    if (isFilterOpen) {
+      // small timeout to ensure element is in DOM
+      setTimeout(() => {
+        panelCategoryRef.current?.focus()
+      }, 0)
+    }
+  }, [isFilterOpen])
+
+  const activeFilterCount = Object.keys(appliedFilters).length
 
   return (
     <main className="page-shell">
@@ -179,27 +241,24 @@ function App() {
               <h2>Expenses</h2>
               <p>Your recent spending</p>
             </div>
-            <span className="count-badge">{expenses.length}</span>
-          </div>
-
-          <div className="filters">
-            <label>
-              Category
-              <input type="text" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} placeholder="e.g. Food" />
-            </label>
-            <label>
-              Start date
-              <input type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} />
-            </label>
-            <label>
-              End date
-              <input type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} />
-            </label>
-            <div className="filter-buttons">
-              <button type="button" onClick={applyFilters} className="primary-button">Apply filters</button>
-              <button type="button" onClick={clearFilters} className="secondary-button">Clear</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className="filter-toggle-button"
+                aria-label="Open filters"
+                aria-haspopup="dialog"
+                aria-expanded={isFilterOpen}
+                onClick={openFilterPanel}
+              >
+                {/* Simple filter icon (text) to avoid extra assets */}
+                Filter
+                {activeFilterCount > 0 && <span className="active-badge" aria-hidden="true">{activeFilterCount}</span>}
+              </button>
+              <span className="count-badge">{expenses.length}</span>
             </div>
           </div>
+
+          {/* The inline filters were removed and replaced with a toggleable side panel */}
 
           {loading ? <p className="empty-state">Loading expenses…</p> : expenses.length === 0 ? (
             <p className="empty-state">No expenses yet. Add one to get started.</p>
@@ -220,6 +279,39 @@ function App() {
           )}
         </section>
       </div>
+
+      {/* Filter Drawer / Side Panel */}
+      {isFilterOpen && <div className="drawer-overlay" onClick={closeFilterPanel} aria-hidden="true" />}
+      <aside
+        className={`filter-drawer ${isFilterOpen ? 'open' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="filter-panel-title"
+      >
+        <div className="drawer-header">
+          <h3 id="filter-panel-title">Filters</h3>
+          <button className="close-button" aria-label="Close filters" onClick={closeFilterPanel}>✕</button>
+        </div>
+        <div className="drawer-body">
+          <label>
+            Category
+            <input ref={panelCategoryRef} type="text" value={panelCategory} onChange={(e) => setPanelCategory(e.target.value)} placeholder="e.g. Food" />
+          </label>
+          <label>
+            Start date
+            <input type="date" value={panelStartDate} onChange={(e) => setPanelStartDate(e.target.value)} />
+          </label>
+          <label>
+            End date
+            <input type="date" value={panelEndDate} onChange={(e) => setPanelEndDate(e.target.value)} />
+          </label>
+        </div>
+        <div className="drawer-footer">
+          <button className="primary-button" type="button" onClick={applyFiltersFromPanel}>Apply filters</button>
+          <button className="secondary-button" type="button" onClick={clearFiltersFromPanel}>Clear</button>
+          <button className="tertiary-button" type="button" onClick={closeFilterPanel}>Cancel</button>
+        </div>
+      </aside>
     </main>
   )
 }
