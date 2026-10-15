@@ -36,6 +36,29 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
+  // Theme state: default to value in localStorage or 'light'
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem('theme') || 'light'
+    } catch (e) {
+      return 'light'
+    }
+  })
+
+  // Apply theme attribute to document so CSS variables take effect
+  useEffect(() => {
+    try {
+      document.documentElement.setAttribute('data-theme', theme)
+      localStorage.setItem('theme', theme)
+    } catch (e) {
+      // ignore storage errors
+    }
+  }, [theme])
+
+  const toggleTheme = () => {
+    setTheme((t) => (t === 'light' ? 'dark' : 'light'))
+  }
+
   // filter input state (controls) - kept for compatibility though inputs are now in a panel
   const [filterCategory, setFilterCategory] = useState('')
   const [filterStartDate, setFilterStartDate] = useState('')
@@ -200,10 +223,30 @@ function App() {
           <h1>Expense Manager</h1>
           <p className="subtitle">Keep track of where your money goes.</p>
         </div>
-        <section className="total-card" aria-label="Total expenses">
-          <span>Total expenses</span>
-          <strong>{Number(total).toFixed(2)}</strong>
-        </section>
+
+        <div className="header-right">
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={toggleTheme}
+            aria-pressed={theme === 'dark'}
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          >
+            {theme === 'dark' ? (
+              // Sun icon for light (when pressed to switch back to light)
+              <span aria-hidden="true">☀️</span>
+            ) : (
+              // Moon icon for dark
+              <span aria-hidden="true">🌙</span>
+            )}
+          </button>
+
+          <section className="total-card" aria-label="Total expenses">
+            <span>Total expenses</span>
+            <strong>{Number(total).toFixed(2)}</strong>
+          </section>
+        </div>
       </header>
 
       {error && <p className="error-banner" role="alert">{error}</p>}
@@ -309,7 +352,6 @@ function App() {
         <div className="drawer-footer">
           <button className="primary-button" type="button" onClick={applyFiltersFromPanel}>Apply filters</button>
           <button className="secondary-button" type="button" onClick={clearFiltersFromPanel}>Clear</button>
-          <button className="tertiary-button" type="button" onClick={closeFilterPanel}>Cancel</button>
         </div>
       </aside>
     </main>
