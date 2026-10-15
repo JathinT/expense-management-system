@@ -1,0 +1,17 @@
+# Ignore build artifacts and local files that should not be included in the image context
+target
+.mvn
+.git
+.gitignore
+.dockerignore
+*.log
+node_modules
+frontend
+
+# Maven local repo (if present in context)
+.m2
+
+# IDE files
+*.iml
+.vscode
+.idea
